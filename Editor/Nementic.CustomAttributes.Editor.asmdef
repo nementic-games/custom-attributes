@@ -1,0 +1,16 @@
+{
+    "name": "Nementic.CustomAttributes.Editor",
+    "references": [
+        "GUID:1387eb4a90e9d6d4382ea9e6a7639a30"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": []
+}
