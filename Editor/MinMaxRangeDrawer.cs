@@ -10,15 +10,12 @@ namespace Nementic
     [CustomPropertyDrawer(typeof(MinMaxRange))]
     public sealed class MinMaxRangeDrawer : PropertyDrawer
     {
-        private const float paddingWhenSliderShown = 5f;
-        private const float miniLabelWidth = 24f;
-
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float height = base.GetPropertyHeight(property, label);
-            var sliderRange = (MinMaxClampAttribute[])fieldInfo.GetCustomAttributes(typeof(MinMaxClampAttribute), true);
-            if (sliderRange.Length > 0)
-                height = (height * 2f) + paddingWhenSliderShown;
+            if (TryGetAttribute(out MinMaxClampAttribute clamp))
+                height = (height * 2f) + 5f;
+
             return height;
         }
 
@@ -36,87 +33,67 @@ namespace Nementic
             EditorGUI.EndProperty();
         }
 
-        private void DrawProperty(Rect position, SerializedProperty property)
+        private void DrawProperty(Rect rect, SerializedProperty property)
         {
-            var minProperty = property.FindPropertyRelative("Min");
-            var maxProperty = property.FindPropertyRelative("Max");
+            SerializedProperty minProp = property.FindPropertyRelative("Min");
+            SerializedProperty maxProp = property.FindPropertyRelative("Max");
 
-            float minValue = minProperty.floatValue;
-            float maxValue = maxProperty.floatValue;
+            rect.height = EditorGUIUtility.singleLineHeight;
+            Rect originalRect = rect;
 
-            float columnWidth = position.width / 2f;
-            float defaultWidth = position.width;
-            float defaultXMin = position.xMin;
+            rect.width = (rect.width / 2f) - 2f;
+            FloatFieldWithMiniLabel(rect, minProp, 24, new GUIContent("Min"));
+            rect.x = rect.xMax + 4f;
+            FloatFieldWithMiniLabel(rect, maxProp, 28, new GUIContent("Max"));
 
-            // Adjust min value float field rect.
-            var leftRect = new Rect(position)
+            if (TryGetAttribute(out MinMaxClampAttribute clamp))
             {
-                width = columnWidth - (miniLabelWidth / 2f),
-                height = EditorGUIUtility.singleLineHeight
-            };
+                rect = originalRect;
+                rect.y += EditorGUIUtility.singleLineHeight;
 
-            // Get slider max and min range. If no attribute is used fall back to not clamping.
-            float rangeMin = minValue;
-            float rangeMax = maxValue;
+                if (property.hasMultipleDifferentValues)
+                {
+                    using (new EditorGUI.DisabledScope(true))
+                    {
+                        EditorGUI.LabelField(rect, "—");
+                    }
+                    return;
+                }
 
-            var sliderRanges = (MinMaxClampAttribute[])fieldInfo.GetCustomAttributes(typeof(MinMaxClampAttribute), true);
-            if (sliderRanges.Length > 0)
-            {
-                rangeMin = sliderRanges[0].Min;
-                rangeMax = sliderRanges[0].Max;
+                minProp.floatValue = Mathf.Clamp(minProp.floatValue, clamp.Min, clamp.Max);
+                maxProp.floatValue = Mathf.Clamp(maxProp.floatValue, clamp.Min, clamp.Max);
+
+                float minValue = minProp.floatValue;
+                float maxValue = maxProp.floatValue;
+                EditorGUI.BeginChangeCheck();
+                EditorGUI.MinMaxSlider(rect, ref minValue, ref maxValue, clamp.Min, clamp.Max);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    EditorGUI.FocusTextInControl(null);
+                    minProp.floatValue = minValue;
+                    maxProp.floatValue = maxValue;
+                }
             }
-
-            // Adjust min value.
-            float minFieldValue = FloatFieldWithMiniLabel(leftRect, miniLabelWidth, "Min", minValue);
-            minFieldValue = minFieldValue > maxValue ? maxValue : minFieldValue;
-
-            if (sliderRanges.Length > 0)
-                minFieldValue = Mathf.Clamp(minFieldValue, rangeMin, rangeMax);
-
-            minValue = minFieldValue;
-
-            position.xMin += leftRect.width;
-            int paddingBetweenLeftRight = 5;
-            position.x = leftRect.xMax + paddingBetweenLeftRight;
-
-            int additionalMaxLabelSize = 4;
-
-            // Adjust max value float field rect.
-            var rightRect = new Rect(position)
-            {
-                width = columnWidth + additionalMaxLabelSize + paddingBetweenLeftRight - 2,
-                height = EditorGUIUtility.singleLineHeight
-            };
-
-            // Adjust max value.
-            var maxFieldValue = FloatFieldWithMiniLabel(rightRect, miniLabelWidth + 4, "Max", maxValue);
-            maxFieldValue = maxFieldValue < minValue ? minValue : maxFieldValue;
-
-            if (sliderRanges.Length > 0)
-                maxFieldValue = Mathf.Clamp(maxFieldValue, rangeMin, rangeMax);
-
-            maxValue = maxFieldValue;
-
-            position.y += EditorGUIUtility.singleLineHeight;
-            position.xMin = defaultXMin;
-            position.width = defaultWidth;
-            position.height = EditorGUIUtility.singleLineHeight;
-
-            // Slider
-            if (sliderRanges.Length > 0)
-                EditorGUI.MinMaxSlider(position, ref minValue, ref maxValue, rangeMin, rangeMax);
-
-            minProperty.floatValue = minValue;
-            maxProperty.floatValue = maxValue;
         }
 
-        private float FloatFieldWithMiniLabel(Rect position, float miniLabelWidth, string miniPrefixLabel, float value)
+        private void FloatFieldWithMiniLabel(Rect position, SerializedProperty property, float labelWidth, GUIContent label)
         {
             float widthBefore = EditorGUIUtility.labelWidth;
-            EditorGUIUtility.labelWidth = miniLabelWidth;
-            var minFieldValue = EditorGUI.FloatField(position, miniPrefixLabel, value);
+            EditorGUIUtility.labelWidth = labelWidth;
+            EditorGUI.PropertyField(position, property, label);
             EditorGUIUtility.labelWidth = widthBefore;
-            return minFieldValue;
+        }
+
+        private bool TryGetAttribute<T>(out T attribute) where T : PropertyAttribute
+        {
+            var attributes = fieldInfo.GetCustomAttributes(typeof(T), true);
+            if (attributes.Length > 0)
+            {
+                attribute = (T)attributes[0];
+                return true;
+            }
+            attribute = null;
+            return false;
         }
     }
 }

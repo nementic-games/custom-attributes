@@ -3,7 +3,11 @@
 
 namespace Nementic
 {
-    public class MinMaxClampAttribute : System.Attribute
+    using System;
+    using UnityEngine;
+
+    [AttributeUsage(AttributeTargets.Field, AllowMultiple = false)]
+    public class MinMaxClampAttribute : PropertyAttribute
     {
         public float Min { get; private set; }
         public float Max { get; private set; }
